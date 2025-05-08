@@ -1,0 +1,21 @@
+/* src/App.css */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.tabs button {
+  padding: 8px 16px;
+  border: 1px solid #2a9d8f;
+  background: #fff;
+  color: #2a9d8f;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.tabs button.active {
+  background: #2a9d8f;
+  color: #fff;
+}

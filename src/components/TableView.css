@@ -1,0 +1,52 @@
+/* src/components/TableView.css */
+
+/* Container: full width + horizontal scroll if needed */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    margin: 20px 0;
+  }
+  
+  /* Optional title above each table */
+  .table-title {
+    margin-bottom: 8px;
+    font-size: 1.2rem;
+    color: #333;
+  }
+  
+  /* Main table styling */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;      /* allow columns to auto-size to content */
+  }
+  
+  /* Header row: green background, white text, wrap-enabled */
+  .data-table thead th {
+    background-color: #2a9d8f;
+    color: #fff;
+    padding: 10px;
+    border: 1px solid #21867a;
+    text-align: left;
+    white-space: normal;     /* allow wrapping */
+    word-break: break-word;  /* break long words */
+    line-height: 1.2;        /* tighten line spacing */
+  }
+  
+  /* Data rows: all white, hover highlight */
+  .data-table tbody tr {
+    background-color: #fff;
+  }
+  .data-table tbody tr:hover {
+    background-color: #e0f2f1;
+  }
+  
+  /* Cells: wrap all content, no ellipsis or max-width */
+  .data-table th,
+  .data-table td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    white-space: normal;     /* allow text to wrap */
+    word-wrap: break-word;   /* break long words */
+  }
+  
