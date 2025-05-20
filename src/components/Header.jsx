@@ -1,9 +1,17 @@
 // components/Header.jsx
 import React, { useState } from "react";
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../authContext.jsx";
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    setUserMenuOpen(false);
+  };
 
   return (
     <header className="bg-white shadow-sm z-10">
@@ -43,13 +51,34 @@ const Header = () => {
             <span className="absolute top-0 right-0 bg-red-500 text-white rounded-full text-xs w-4 h-4 flex items-center justify-center">3</span>
           </button>
           
-          <div className="ml-4 flex items-center">
-            <img
-              className="h-8 w-8 rounded-full object-cover"
-              src="https://ui-avatars.com/api/?name=Admin&background=0D8ABC&color=fff"
-              alt="Profile"
-            />
-            <span className="ml-2 text-sm font-medium text-gray-700 hidden md:block">Admin</span>
+          <div className="ml-4 relative">
+            <div>
+              <button 
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center focus:outline-none"
+              >
+                <img
+                  className="h-8 w-8 rounded-full object-cover"
+                  src="https://ui-avatars.com/api/?name=Admin&background=0D8ABC&color=fff"
+                  alt="Profile"
+                />
+                <span className="ml-2 text-sm font-medium text-gray-700 hidden md:block">{user?.name || "Admin"}</span>
+                <svg className="ml-1 h-5 w-5 text-gray-400 hidden md:block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            
+            {userMenuOpen && (
+              <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 z-10">
+                <button
+                  onClick={handleLogout}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
