@@ -1,10 +1,12 @@
 // components/Dashboard.jsx
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import FilterBar from "./FilterBar";
 import StatusCard from "./StatusCard";
 
 const Dashboard = ({ bookings }) => {
+  const navigate = useNavigate();
   const [filteredData, setFilteredData] = useState(bookings);
   const [dateRange, setDateRange] = useState({ start: null, end: null });
   const [selectedParking, setSelectedParking] = useState("All");
@@ -38,7 +40,7 @@ const Dashboard = ({ bookings }) => {
 
   // Calculate stats
   const totalBookings = filteredData.length;
-  const activeBookings = filteredData.filter(b => b.status === true).length;
+  const activeBookings = filteredData.filter(b => b.status === true && b.isCancel !== true).length;
   const cancelledBookings = filteredData.filter(b => b.isCancel === true).length;
   const totalRevenue = filteredData.reduce((sum, booking) => sum + (parseInt(booking.amount) || 0), 0);
 
@@ -142,6 +144,7 @@ const Dashboard = ({ bookings }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
           </svg>}
           color="blue"
+          onClick={() => navigate('/table')}
         />
         <StatusCard 
           title="Active Bookings" 
@@ -150,6 +153,20 @@ const Dashboard = ({ bookings }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>}
           color="green"
+          onClick={() => {
+            // Navigate to table view with active filter
+            navigate('/table', { 
+              state: { 
+                initialFilters: {
+                  dateRange: dateRange,
+                  parkingName: selectedParking,
+                  vehicleType: "All",
+                  searchTerm: "",
+                  status: "Active"
+                }
+              }
+            });
+          }}
         />
         <StatusCard 
           title="Cancelled Bookings" 
@@ -158,6 +175,20 @@ const Dashboard = ({ bookings }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>}
           color="red"
+          onClick={() => {
+            // Navigate to table view with cancelled filter
+            navigate('/table', { 
+              state: { 
+                initialFilters: {
+                  dateRange: dateRange,
+                  parkingName: selectedParking,
+                  vehicleType: "All",
+                  searchTerm: "",
+                  status: "Cancelled"
+                }
+              }
+            });
+          }}
         />
         <StatusCard 
           title="Total Revenue" 
@@ -166,6 +197,7 @@ const Dashboard = ({ bookings }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>}
           color="amber"
+          onClick={() => navigate('/table')}
         />
       </div>
       

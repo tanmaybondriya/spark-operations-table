@@ -1,7 +1,7 @@
 // components/StatusCard.jsx
 import React from "react";
 
-const StatusCard = ({ title, value, icon, color }) => {
+const StatusCard = ({ title, value, icon, color, onClick }) => {
   const getColorClasses = () => {
     switch (color) {
       case 'blue':
@@ -18,7 +18,10 @@ const StatusCard = ({ title, value, icon, color }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-4">
+    <div 
+      className={`bg-white rounded-lg shadow p-4 ${onClick ? 'cursor-pointer transition-all hover:shadow-md hover:translate-y-[-2px]' : ''}`}
+      onClick={onClick}
+    >
       <div className="flex items-center">
         <div className={`p-3 rounded-full mr-4 ${getColorClasses()}`}>
           {icon}

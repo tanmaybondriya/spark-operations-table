@@ -1,10 +1,14 @@
 // components/TableView.jsx
 import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
 import TableFilters from "./TableFilters";
 
 const TableView = ({ bookings }) => {
+  const location = useLocation();
+  const initialFilters = location.state?.initialFilters;
+  
   const [filteredData, setFilteredData] = useState(bookings);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -16,6 +20,13 @@ const TableView = ({ bookings }) => {
     searchTerm: "",
     status: "All"
   });
+  
+  // Apply initial filters if provided
+  useEffect(() => {
+    if (initialFilters) {
+      setFilters(initialFilters);
+    }
+  }, [initialFilters]);
   
   // Apply filters and sorting
   useEffect(() => {
