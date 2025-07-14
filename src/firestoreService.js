@@ -1,5 +1,5 @@
 // firestoreService.js
-import { collection, getDocs, query, orderBy, limit, where } from "firebase/firestore";
+import { collection, getDocs, doc, deleteDoc, query, orderBy, limit, where } from "firebase/firestore";
 import { db } from "./firebase";
 
 // Fetch all documents from a collection
@@ -80,6 +80,26 @@ export const fetchRecentBookings = async () => {
     }));
   } catch (error) {
     console.error("Error fetching recent bookings:", error);
+    throw error;
+  }
+};
+
+// Delete document by ID
+export const deleteDocument = async (collectionName, docId) => {
+  if (!collectionName || !docId) {
+    console.error("Missing collection name or document ID for deletion");
+    throw new Error("Invalid parameters for document deletion");
+  }
+
+  console.log(`Attempting to delete document ${docId} from collection ${collectionName}`);
+  
+  try {
+    const docRef = doc(db, collectionName, docId);
+    await deleteDoc(docRef);
+    console.log(`Successfully deleted document ${docId} from ${collectionName}`);
+    return { success: true, id: docId };
+  } catch (error) {
+    console.error(`Error deleting document from ${collectionName}:`, error);
     throw error;
   }
 };

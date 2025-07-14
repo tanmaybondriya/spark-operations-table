@@ -4,11 +4,14 @@ import { useLocation } from "react-router-dom";
 import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
 import TableFilters from "./TableFilters";
+import { deleteDocument } from "../firestoreService";
+import Toast from "./Toast";
+import DeleteModal from "./DeleteModal";
 
-const TableView = ({ bookings }) => {
+const TableView = ({ bookings, setBookings }) => {
   const location = useLocation();
   const initialFilters = location.state?.initialFilters;
-  
+
   const [filteredData, setFilteredData] = useState(bookings);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -20,40 +23,96 @@ const TableView = ({ bookings }) => {
     searchTerm: "",
     status: "All"
   });
-  
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null); // stores the ID of the booking to delete
+  const [toast, setToast] = useState(null); // for toast notifications
+
   // Apply initial filters if provided
   useEffect(() => {
     if (initialFilters) {
       setFilters(initialFilters);
     }
   }, [initialFilters]);
-  
+
+  // Update filteredData when bookings change
+  useEffect(() => {
+    setFilteredData(bookings);
+  }, [bookings]);
+
+  // Handle delete booking
+  const handleDeleteBooking = async (bookingId) => {
+    if (!bookingId) {
+      console.error("No booking ID provided for deletion");
+      setDeleteError("Invalid booking information. Please try again.");
+      return;
+    }
+
+    console.log("Deleting booking ID:", bookingId);
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      // Perform the delete operation
+      const result = await deleteDocument("bookings", bookingId);
+      console.log("Delete result:", result);
+
+      // Update the filtered data first (local component state)
+      setFilteredData(prevFiltered => prevFiltered.filter(booking => booking.id !== bookingId));
+
+      // Then update the parent component state if setBookings exists
+      if (typeof setBookings === 'function') {
+        setBookings(prev => prev.filter(booking => booking.id !== bookingId));
+      }
+
+      // Close the confirmation dialog
+      setShowDeleteConfirm(null);
+
+      // Show success toast
+      setToast({
+        message: "Booking deleted successfully!",
+        type: "success"
+      });
+    } catch (error) {
+      console.error("Error deleting booking:", error);
+      setDeleteError(`Failed to delete booking: ${error.message}`);
+
+      // Show error toast
+      setToast({
+        message: `Failed to delete booking: ${error.message}`,
+        type: "error"
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Apply filters and sorting
   useEffect(() => {
     let filtered = [...bookings];
-    
+
     // Filter by date range
     if (filters.dateRange.start && filters.dateRange.end) {
       const startTime = filters.dateRange.start.getTime();
       const endTime = filters.dateRange.end.getTime();
-      
+
       filtered = filtered.filter(booking => {
         if (!booking.start_date || !booking.start_date.seconds) return false;
         const bookingTime = booking.start_date.seconds * 1000;
         return bookingTime >= startTime && bookingTime <= endTime;
       });
     }
-    
+
     // Filter by parking name
     if (filters.parkingName !== "All") {
       filtered = filtered.filter(booking => booking.parking_name === filters.parkingName);
     }
-    
+
     // Filter by vehicle type
     if (filters.vehicleType !== "All") {
       filtered = filtered.filter(booking => booking.vehicle_type === filters.vehicleType);
     }
-    
+
     // Filter by status
     if (filters.status !== "All") {
       if (filters.status === "Active") {
@@ -62,18 +121,18 @@ const TableView = ({ bookings }) => {
         filtered = filtered.filter(booking => booking.isCancel === true);
       }
     }
-    
+
     // Filter by search term
     if (filters.searchTerm) {
       const searchLower = filters.searchTerm.toLowerCase();
-      filtered = filtered.filter(booking => 
+      filtered = filtered.filter(booking =>
         (booking.name && booking.name.toLowerCase().includes(searchLower)) ||
         (booking.phone_no && booking.phone_no.includes(filters.searchTerm)) ||
         (booking.vehicle_number && booking.vehicle_number.toLowerCase().includes(searchLower)) ||
         (booking.token_no && booking.token_no.toString().includes(filters.searchTerm))
       );
     }
-    
+
     // Apply sorting
     if (sortConfig.key) {
       filtered.sort((a, b) => {
@@ -81,18 +140,18 @@ const TableView = ({ bookings }) => {
         if (sortConfig.key === 'start_date' || sortConfig.key === 'end_time') {
           const aValue = a[sortConfig.key]?.seconds || 0;
           const bValue = b[sortConfig.key]?.seconds || 0;
-          
+
           if (sortConfig.direction === 'asc') {
             return aValue - bValue;
           } else {
             return bValue - aValue;
           }
-        } 
+        }
         // Handle sorting for other fields
         else {
           const aValue = a[sortConfig.key] || '';
           const bValue = b[sortConfig.key] || '';
-          
+
           if (sortConfig.direction === 'asc') {
             return aValue > bValue ? 1 : -1;
           } else {
@@ -101,11 +160,11 @@ const TableView = ({ bookings }) => {
         }
       });
     }
-    
+
     setFilteredData(filtered);
     setCurrentPage(1); // Reset to first page when filters change
   }, [bookings, filters, sortConfig]);
-  
+
   const handleSort = (key) => {
     setSortConfig(prevConfig => {
       return {
@@ -114,7 +173,7 @@ const TableView = ({ bookings }) => {
       };
     });
   };
-  
+
   const resetFilters = () => {
     setFilters({
       dateRange: { start: null, end: null },
@@ -125,7 +184,7 @@ const TableView = ({ bookings }) => {
     });
     setSortConfig({ key: 'start_date', direction: 'desc' });
   };
-  
+
   // Export functions
   const exportCSV = () => {
     // Create a formatted version of the data
@@ -147,16 +206,18 @@ const TableView = ({ bookings }) => {
         "Amount Received (₹)": item.amount || ""
       };
     });
-    
+
     // Generate CSV
     const ws = XLSX.utils.json_to_sheet(formattedData);
     const csv = XLSX.utils.sheet_to_csv(ws);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     saveAs(blob, `parking_bookings_export_${new Date().toISOString().split('T')[0]}.csv`);
   };
-  
-  const exportExcel = () => {
-    // Use the same formatted data as for CSV
+
+  // Enhanced export functions with WebView support
+const exportExcel = () => {
+  try {
+    // Use the same formatted data as before
     const formattedData = filteredData.map((item, idx) => {
       return {
         "Sr. No.": idx + 1,
@@ -175,40 +236,168 @@ const TableView = ({ bookings }) => {
         "Amount Received (₹)": item.amount || ""
       };
     });
-    
+
     // Generate Excel
     const ws = XLSX.utils.json_to_sheet(formattedData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Bookings");
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8" });
-    saveAs(blob, `parking_bookings_export_${new Date().toISOString().split('T')[0]}.xlsx`);
-  };
-  
+    
+    const fileName = `parking_bookings_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    // Method 1: Try standard download first
+    try {
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { 
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8" 
+      });
+      saveAs(blob, fileName);
+      return;
+    } catch (error) {
+      console.log("Standard download failed, trying alternative methods...", error);
+    }
+
+    // Method 2: Try direct download link approach
+    try {
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { 
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" 
+      });
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.style.display = 'none';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      return;
+    } catch (error) {
+      console.log("Direct download failed, trying base64 method...", error);
+    }
+
+    // Method 3: Base64 data URL approach (works better in some WebViews)
+    try {
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+      const dataURL = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${excelBuffer}`;
+      
+      const link = document.createElement('a');
+      link.href = dataURL;
+      link.download = fileName;
+      link.style.display = 'none';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    } catch (error) {
+      console.log("Base64 download failed, trying window.open...", error);
+    }
+
+    // Method 4: Open in new window/tab (fallback)
+    try {
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+      const dataURL = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${excelBuffer}`;
+      window.open(dataURL, '_blank');
+      return;
+    } catch (error) {
+      console.log("Window.open failed, trying postMessage...", error);
+    }
+
+    // Method 5: PostMessage to parent (for embedded WebViews)
+    try {
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+      
+      // Try to communicate with parent window/app
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'DOWNLOAD_FILE',
+          data: excelBuffer,
+          fileName: fileName,
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }, '*');
+        
+        // Show success message
+        setToast({
+          message: "Export initiated. Please check your downloads.",
+          type: "success"
+        });
+        return;
+      }
+      
+      // Try Android WebView interface
+      if (window.Android && window.Android.downloadFile) {
+        window.Android.downloadFile(excelBuffer, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        setToast({
+          message: "Export initiated. Please check your downloads.",
+          type: "success"
+        });
+        return;
+      }
+      
+      // Try iOS WebView interface
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.downloadFile) {
+        window.webkit.messageHandlers.downloadFile.postMessage({
+          data: excelBuffer,
+          fileName: fileName,
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+        setToast({
+          message: "Export initiated. Please check your downloads.",
+          type: "success"
+        });
+        return;
+      }
+      
+    } catch (error) {
+      console.log("PostMessage failed...", error);
+    }
+
+    // If all methods fail, show error
+    setToast({
+      message: "Export failed. Please try using a regular browser.",
+      type: "error"
+    });
+    
+  } catch (error) {
+    console.error("Excel export error:", error);
+    setToast({
+      message: `Export failed: ${error.message}`,
+      type: "error"
+    });
+  }
+};
+
+
   // Get unique options for filters
   const getParkingOptions = () => {
     const parkingNames = new Set(bookings.map(b => b.parking_name).filter(Boolean));
     return ["All", ...parkingNames];
   };
-  
+
   const getVehicleTypeOptions = () => {
     const vehicleTypes = new Set(bookings.map(b => b.vehicle_type).filter(Boolean));
     return ["All", ...vehicleTypes];
   };
-  
+
   // Pagination logic
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  
+
   // Format timestamp
   const formatTimestamp = (timestamp) => {
     if (!timestamp || !timestamp.seconds) return "-";
     return new Date(timestamp.seconds * 1000).toLocaleString();
   };
-  
-  // Column definitions for the table
+
+  // Column definitions for the table (used for headers on larger screens, and labels on smaller)
   const columns = [
     { key: "sr_no", label: "Sr. No.", sortable: false },
     { key: "parking_name", label: "Parking Name", sortable: true },
@@ -223,52 +412,54 @@ const TableView = ({ bookings }) => {
     { key: "status", label: "Status", sortable: true },
     { key: "start_time", label: "Start Time", sortable: true },
     { key: "end_time", label: "End Time", sortable: true },
-    { key: "amount", label: "Amount (₹)", sortable: true }
+    { key: "amount", label: "Amount (₹)", sortable: true },
+    { key: "actions", label: "Actions", sortable: false }
   ];
-  
+
   return (
-    <div>
+    <div className="p-4 sm:p-6 mb-30"> {/* Added padding for better mobile spacing */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
         <h1 className="text-2xl font-bold text-gray-800 mb-2 sm:mb-0">Booking Records</h1>
-        
-        <div className="flex gap-2">
-          <button 
+
+        <div className="hidden sm:flex flex-col sm:flex-row gap-2 w-full sm:w-auto"> {/* Hide buttons on mobile */}
+          <button
             onClick={exportCSV}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 w-full sm:w-auto"
           >
             Export CSV
           </button>
-          <button 
+          <button
             onClick={exportExcel}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
           >
             Export Excel
           </button>
         </div>
       </div>
-      
-      <TableFilters 
+
+      <TableFilters
         filters={filters}
         setFilters={setFilters}
         resetFilters={resetFilters}
         parkingOptions={getParkingOptions()}
         vehicleTypeOptions={getVehicleTypeOptions()}
       />
-      
+
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Table for larger screens */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 {columns.map(column => (
-                  <th 
+                  <th
                     key={column.key}
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                   >
                     <div className="flex items-center">
                       {column.label}
                       {column.sortable && (
-                        <button 
+                        <button
                           onClick={() => handleSort(column.key)}
                           className="ml-1 focus:outline-none"
                         >
@@ -330,10 +521,10 @@ const TableView = ({ bookings }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        booking.isCancel 
-                          ? "bg-red-100 text-red-800" 
-                          : booking.status 
-                            ? "bg-green-100 text-green-800" 
+                        booking.isCancel
+                          ? "bg-red-100 text-red-800"
+                          : booking.status
+                            ? "bg-green-100 text-green-800"
                             : "bg-gray-100 text-gray-800"
                       }`}>
                         {booking.isCancel ? "Cancelled" : (booking.status ? "Active" : "Inactive")}
@@ -348,6 +539,17 @@ const TableView = ({ bookings }) => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {booking.amount ? `₹${booking.amount}` : "-"}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <button
+                        onClick={() => setShowDeleteConfirm(booking.id)}
+                        className="text-red-600 hover:text-red-900 focus:outline-none"
+                        title="Delete booking"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                      </button>
+                    </td>
                   </tr>
                 ))
               ) : (
@@ -360,16 +562,70 @@ const TableView = ({ bookings }) => {
             </tbody>
           </table>
         </div>
-        
+
+        {/* Card-based layout for small screens */}
+        <div className="sm:hidden p-4">
+          {currentItems.length > 0 ? (
+            currentItems.map((booking, index) => (
+              <div key={booking.id || index} className="bg-white shadow rounded-lg p-4 mb-4 border border-gray-200">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-lg font-bold text-gray-800">
+                    Booking #{indexOfFirstItem + index + 1}
+                  </h3>
+                  <button
+                    onClick={() => setShowDeleteConfirm(booking.id)}
+                    className="text-red-600 hover:text-red-900 focus:outline-none"
+                    title="Delete booking"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                  </button>
+                </div>
+                {columns.map(column => {
+                  if (column.key === "sr_no" || column.key === "actions") return null; // Handled separately
+                  let displayValue;
+                  switch (column.key) {
+                    case "start_date":
+                    case "start_time":
+                    case "end_time":
+                      displayValue = formatTimestamp(booking[column.key]);
+                      break;
+                    case "status":
+                      displayValue = booking.isCancel ? "Cancelled" : (booking.status ? "Active" : "Inactive");
+                      break;
+                    case "amount":
+                      displayValue = booking.amount ? `₹${booking.amount}` : "-";
+                      break;
+                    default:
+                      displayValue = booking[column.key] || "-";
+                  }
+                  return (
+                    <div key={column.key} className="flex justify-between py-1 text-sm">
+                      <span className="font-medium text-gray-600">{column.label}:</span>
+                      <span className={`font-semibold ${column.key === 'status' ? (booking.isCancel ? "text-red-800" : (booking.status ? "text-green-800" : "text-gray-800")) : "text-gray-900"}`}>
+                        {displayValue}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))
+          ) : (
+            <p className="text-center text-gray-500 py-4">No records found</p>
+          )}
+        </div>
+
         {/* Pagination */}
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-          <div className="flex-1 flex justify-between sm:hidden">
+        <div className="bg-white px-4 py-3 flex flex-col sm:flex-row items-center justify-between border-t border-gray-200 sm:px-6">
+          {/* Mobile pagination controls (Previous/Next) */}
+          <div className="flex-1 flex justify-between sm:hidden w-full mb-4">
             <button
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
               className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
-                currentPage === 1 
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                currentPage === 1
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                   : "bg-white text-gray-700 hover:bg-gray-50"
               }`}
             >
@@ -380,14 +636,16 @@ const TableView = ({ bookings }) => {
               disabled={currentPage === totalPages || totalPages === 0}
               className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
                 currentPage === totalPages || totalPages === 0
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                   : "bg-white text-gray-700 hover:bg-gray-50"
               }`}
             >
               Next
             </button>
           </div>
-          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+
+          {/* Desktop pagination controls and info */}
+          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between w-full">
             <div>
               <p className="text-sm text-gray-700">
                 Showing <span className="font-medium">{filteredData.length > 0 ? indexOfFirstItem + 1 : 0}</span> to{" "}
@@ -397,19 +655,17 @@ const TableView = ({ bookings }) => {
                 of <span className="font-medium">{filteredData.length}</span> results
               </p>
             </div>
-            <div>
-              <div className="flex items-center">
-                <span className="mr-2 text-sm text-gray-700">Items per page:</span>
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                  className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  {[10, 25, 50, 100].map(size => (
-                    <option key={size} value={size}>{size}</option>
-                  ))}
-                </select>
-              </div>
+            <div className="flex items-center">
+              <span className="mr-2 text-sm text-gray-700">Items per page:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                className="border border-gray-300 rounded-md py-1 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              >
+                {[10, 25, 50, 100].map(size => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
             </div>
             <div>
               <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
@@ -417,8 +673,8 @@ const TableView = ({ bookings }) => {
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
                   className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 text-sm font-medium ${
-                    currentPage === 1 
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                    currentPage === 1
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                       : "bg-white text-gray-500 hover:bg-gray-50"
                   }`}
                 >
@@ -432,8 +688,8 @@ const TableView = ({ bookings }) => {
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
                   className={`relative inline-flex items-center px-2 py-2 border border-gray-300 text-sm font-medium ${
-                    currentPage === 1 
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                    currentPage === 1
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                       : "bg-white text-gray-500 hover:bg-gray-50"
                   }`}
                 >
@@ -442,13 +698,13 @@ const TableView = ({ bookings }) => {
                     <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                 </button>
-                
+
                 {/* Page numbers */}
                 {[...Array(totalPages).keys()].map(number => {
                   // Only show nearby pages, first, last and current
                   if (
-                    number === 0 || 
-                    number === totalPages - 1 || 
+                    number === 0 ||
+                    number === totalPages - 1 ||
                     Math.abs(number + 1 - currentPage) <= 2
                   ) {
                     return (
@@ -465,7 +721,7 @@ const TableView = ({ bookings }) => {
                       </button>
                     );
                   }
-                  
+
                   // Show ellipsis
                   if (
                     (number === 1 && currentPage > 4) ||
@@ -480,16 +736,16 @@ const TableView = ({ bookings }) => {
                       </span>
                     );
                   }
-                  
+
                   return null;
                 })}
-                
+
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages || totalPages === 0}
                   className={`relative inline-flex items-center px-2 py-2 border border-gray-300 text-sm font-medium ${
                     currentPage === totalPages || totalPages === 0
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                       : "bg-white text-gray-500 hover:bg-gray-50"
                   }`}
                 >
@@ -503,7 +759,7 @@ const TableView = ({ bookings }) => {
                   disabled={currentPage === totalPages || totalPages === 0}
                   className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 text-sm font-medium ${
                     currentPage === totalPages || totalPages === 0
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                       : "bg-white text-gray-500 hover:bg-gray-50"
                   }`}
                 >
@@ -518,6 +774,24 @@ const TableView = ({ bookings }) => {
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      {/* Delete Modal using the dedicated component */}
+      <DeleteModal
+        isOpen={!!showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(null)}
+        onConfirm={() => handleDeleteBooking(showDeleteConfirm)}
+        isDeleting={isDeleting}
+        error={deleteError}
+      />
     </div>
   );
 };
