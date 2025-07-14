@@ -287,7 +287,7 @@ const TableView = ({ bookings, setBookings }) => {
   ];
 
   return (
-    <div className="p-4 sm:p-6"> {/* Added padding for better mobile spacing */}
+    <div className="p-4 sm:p-6 mb-30"> {/* Added padding for better mobile spacing */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
         <h1 className="text-2xl font-bold text-gray-800 mb-2 sm:mb-0">Booking Records</h1>
 
