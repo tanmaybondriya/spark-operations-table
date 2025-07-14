@@ -214,8 +214,10 @@ const TableView = ({ bookings, setBookings }) => {
     saveAs(blob, `parking_bookings_export_${new Date().toISOString().split('T')[0]}.csv`);
   };
 
-  const exportExcel = () => {
-    // Use the same formatted data as for CSV
+  // Enhanced export functions with WebView support
+const exportExcel = () => {
+  try {
+    // Use the same formatted data as before
     const formattedData = filteredData.map((item, idx) => {
       return {
         "Sr. No.": idx + 1,
@@ -239,10 +241,138 @@ const TableView = ({ bookings, setBookings }) => {
     const ws = XLSX.utils.json_to_sheet(formattedData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Bookings");
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8" });
-    saveAs(blob, `parking_bookings_export_${new Date().toISOString().split('T')[0]}.xlsx`);
-  };
+    
+    const fileName = `parking_bookings_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    // Method 1: Try standard download first
+    try {
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { 
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8" 
+      });
+      saveAs(blob, fileName);
+      return;
+    } catch (error) {
+      console.log("Standard download failed, trying alternative methods...", error);
+    }
+
+    // Method 2: Try direct download link approach
+    try {
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { 
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" 
+      });
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.style.display = 'none';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      return;
+    } catch (error) {
+      console.log("Direct download failed, trying base64 method...", error);
+    }
+
+    // Method 3: Base64 data URL approach (works better in some WebViews)
+    try {
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+      const dataURL = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${excelBuffer}`;
+      
+      const link = document.createElement('a');
+      link.href = dataURL;
+      link.download = fileName;
+      link.style.display = 'none';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    } catch (error) {
+      console.log("Base64 download failed, trying window.open...", error);
+    }
+
+    // Method 4: Open in new window/tab (fallback)
+    try {
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+      const dataURL = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${excelBuffer}`;
+      window.open(dataURL, '_blank');
+      return;
+    } catch (error) {
+      console.log("Window.open failed, trying postMessage...", error);
+    }
+
+    // Method 5: PostMessage to parent (for embedded WebViews)
+    try {
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+      
+      // Try to communicate with parent window/app
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'DOWNLOAD_FILE',
+          data: excelBuffer,
+          fileName: fileName,
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }, '*');
+        
+        // Show success message
+        setToast({
+          message: "Export initiated. Please check your downloads.",
+          type: "success"
+        });
+        return;
+      }
+      
+      // Try Android WebView interface
+      if (window.Android && window.Android.downloadFile) {
+        window.Android.downloadFile(excelBuffer, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        setToast({
+          message: "Export initiated. Please check your downloads.",
+          type: "success"
+        });
+        return;
+      }
+      
+      // Try iOS WebView interface
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.downloadFile) {
+        window.webkit.messageHandlers.downloadFile.postMessage({
+          data: excelBuffer,
+          fileName: fileName,
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+        setToast({
+          message: "Export initiated. Please check your downloads.",
+          type: "success"
+        });
+        return;
+      }
+      
+    } catch (error) {
+      console.log("PostMessage failed...", error);
+    }
+
+    // If all methods fail, show error
+    setToast({
+      message: "Export failed. Please try using a regular browser.",
+      type: "error"
+    });
+    
+  } catch (error) {
+    console.error("Excel export error:", error);
+    setToast({
+      message: `Export failed: ${error.message}`,
+      type: "error"
+    });
+  }
+};
+
 
   // Get unique options for filters
   const getParkingOptions = () => {
