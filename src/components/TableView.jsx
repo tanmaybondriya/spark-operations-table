@@ -421,7 +421,7 @@ const exportExcel = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
         <h1 className="text-2xl font-bold text-gray-800 mb-2 sm:mb-0">Booking Records</h1>
 
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto"> {/* Stack buttons on mobile */}
+        <div className="hidden sm:flex flex-col sm:flex-row gap-2 w-full sm:w-auto"> {/* Hide buttons on mobile */}
           <button
             onClick={exportCSV}
             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 w-full sm:w-auto"
