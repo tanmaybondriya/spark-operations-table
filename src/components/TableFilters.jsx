@@ -3,33 +3,32 @@ import React from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
-const TableFilters = ({ 
-  filters, 
-  setFilters, 
-  resetFilters, 
-  parkingOptions, 
-  vehicleTypeOptions 
+const TableFilters = ({
+  filters,
+  setFilters,
+  resetFilters,
+  parkingOptions,
+  vehicleTypeOptions
 }) => {
   return (
-    <div className="bg-white rounded-lg shadow p-4 mb-6">
+    <div className="bg-white rounded-lg shadow p-4 mb-6 overflow-x-auto">
       <div className="mb-2 flex items-center justify-between">
         <h2 className="text-lg font-medium text-gray-700">Filters</h2>
-        <button 
+        <button
           onClick={resetFilters}
-          className="text-sm text-blue-600 hover:text-blue-800"
+          className="text-sm sm:text-base text-blue-600 hover:text-blue-800"
         >
           Reset All
         </button>
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {/* Date Range */}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
           <DatePicker
             selected={filters.dateRange.start}
             onChange={(date) => setFilters(prev => ({
-              ...prev, 
+              ...prev,
               dateRange: { ...prev.dateRange, start: date }
             }))}
             selectsStart
@@ -39,13 +38,13 @@ const TableFilters = ({
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
           <DatePicker
             selected={filters.dateRange.end}
             onChange={(date) => setFilters(prev => ({
-              ...prev, 
+              ...prev,
               dateRange: { ...prev.dateRange, end: date }
             }))}
             selectsEnd
@@ -56,8 +55,7 @@ const TableFilters = ({
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
-        
-        {/* Parking Name */}
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Parking Location</label>
           <select
@@ -73,8 +71,7 @@ const TableFilters = ({
             ))}
           </select>
         </div>
-        
-        {/* Vehicle Type */}
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Type</label>
           <select
@@ -90,8 +87,7 @@ const TableFilters = ({
             ))}
           </select>
         </div>
-        
-        {/* Status */}
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
           <select
@@ -108,8 +104,7 @@ const TableFilters = ({
           </select>
         </div>
       </div>
-      
-      {/* Search Bar */}
+
       <div className="mt-4">
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
