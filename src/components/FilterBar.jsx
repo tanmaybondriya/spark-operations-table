@@ -3,12 +3,20 @@ import React from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
-const FilterBar = ({ dateRange, setDateRange, selectedParking, setSelectedParking, parkingOptions }) => {
+const FilterBar = ({
+  dateRange,
+  setDateRange,
+  selectedParking,
+  setSelectedParking,
+  parkingOptions,
+}) => {
   return (
     <div className="bg-white rounded-lg shadow p-4 mb-6">
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Date Range
+          </label>
           <div className="flex items-center gap-2">
             <DatePicker
               selected={dateRange.start}
@@ -32,22 +40,26 @@ const FilterBar = ({ dateRange, setDateRange, selectedParking, setSelectedParkin
             />
           </div>
         </div>
-        
+
         <div className="w-full md:w-64">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Parking Location</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Parking Location
+          </label>
           <select
             value={selectedParking}
             onChange={(e) => setSelectedParking(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            {parkingOptions.map(option => (
-              <option key={option} value={option}>{option}</option>
+            {parkingOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
             ))}
           </select>
         </div>
-        
+
         <div className="flex items-end">
-          <button 
+          <button
             onClick={() => {
               setDateRange({ start: null, end: null });
               setSelectedParking("All");
